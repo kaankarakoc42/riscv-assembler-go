@@ -1,0 +1,28 @@
+// Tang Nano 9K constraint file (Gowin .cst format).
+// This file is loaded by Gowin EDA to map top-level ports to physical pads.
+
+// 27 MHz clock (built-in oscillator)
+IO_LOC "clk" 52;
+IO_PORT "clk" PULL_MODE=NONE IO_TYPE=LVCMOS33;
+
+// S1 button (active-low when pressed)
+IO_LOC "rst_n" 4;
+IO_PORT "rst_n" PULL_MODE=UP IO_TYPE=LVCMOS18;
+
+// 6 onboard LEDs (LED1..LED6, active-low)
+IO_LOC "leds[0]" 10;
+IO_LOC "leds[1]" 11;
+IO_LOC "leds[2]" 13;
+IO_LOC "leds[3]" 14;
+IO_LOC "leds[4]" 15;
+IO_LOC "leds[5]" 16;
+IO_PORT "leds[0]" PULL_MODE=NONE IO_TYPE=LVCMOS18;
+IO_PORT "leds[1]" PULL_MODE=NONE IO_TYPE=LVCMOS18;
+IO_PORT "leds[2]" PULL_MODE=NONE IO_TYPE=LVCMOS18;
+IO_PORT "leds[3]" PULL_MODE=NONE IO_TYPE=LVCMOS18;
+IO_PORT "leds[4]" PULL_MODE=NONE IO_TYPE=LVCMOS18;
+IO_PORT "leds[5]" PULL_MODE=NONE IO_TYPE=LVCMOS18;
+
+// UART TX on the BL616 USB-UART bridge (RX from board's perspective)
+IO_LOC "uart_tx" 17;
+IO_PORT "uart_tx" PULL_MODE=NONE IO_TYPE=LVCMOS33;

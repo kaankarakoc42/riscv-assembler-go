@@ -1,0 +1,17 @@
+Memory layout:
+  .text @ 0x00000000 (96 bytes)
+  .data @ 0x00000060 (0 bytes)
+
+Input placements:
+  build/counter/start.ro                   .text @ 0x00000000 (20 bytes)
+  build/counter/counter.ro                 .text @ 0x00000014 (44 bytes)
+  build/counter/io.ro                      .text @ 0x00000040 (32 bytes)
+  build/counter/start.ro                   .data @ 0x00000060 (0 bytes)
+  build/counter/counter.ro                 .data @ 0x00000060 (0 bytes)
+  build/counter/io.ro                      .data @ 0x00000060 (0 bytes)
+
+Global symbols:
+  _start                           0x00000000  (from build/counter/start.ro)
+  main                             0x00000014  (from build/counter/counter.ro)
+  read_ms                          0x00000050  (from build/counter/io.ro)
+  set_leds                         0x00000040  (from build/counter/io.ro)

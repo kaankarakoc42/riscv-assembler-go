@@ -1,0 +1,12 @@
+# Linker script for the blink demo (PicoRV32 + Tang Nano 9K, 8 KiB BRAM).
+
+[memory]
+rom_base = 0x00000000
+rom_size = 0x2000        # 8 KiB
+ram_base = 0x00010000
+ram_size = 0x1000
+
+[layout]
+text_at = rom
+data_at = rom            # follow .text in BRAM
+entry   = 0x00000000     # PicoRV32 reset vector

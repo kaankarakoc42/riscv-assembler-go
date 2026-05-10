@@ -1,0 +1,14 @@
+Memory layout:
+  .text @ 0x00000000 (120 bytes)
+  .data @ 0x00000078 (0 bytes)
+
+Input placements:
+  build/blink/start.ro                     .text @ 0x00000000 (36 bytes)
+  build/blink/blink.ro                     .text @ 0x00000024 (84 bytes)
+  build/blink/start.ro                     .data @ 0x00000078 (0 bytes)
+  build/blink/blink.ro                     .data @ 0x00000078 (0 bytes)
+
+Global symbols:
+  _start                           0x00000000  (from build/blink/start.ro)
+  delay                            0x00000014  (from build/blink/start.ro)
+  main                             0x00000024  (from build/blink/blink.ro)

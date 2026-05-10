@@ -1,0 +1,21 @@
+Memory layout:
+  .text @ 0x00000000 (244 bytes)
+  .data @ 0x000000F4 (16 bytes)
+
+Input placements:
+  build/uart/start.ro                      .text @ 0x00000000 (20 bytes)
+  build/uart/hello.ro                      .text @ 0x00000014 (56 bytes)
+  build/uart/uart.ro                       .text @ 0x0000004C (152 bytes)
+  build/uart/io.ro                         .text @ 0x000000E4 (16 bytes)
+  build/uart/start.ro                      .data @ 0x000000F4 (0 bytes)
+  build/uart/hello.ro                      .data @ 0x000000F4 (16 bytes)
+  build/uart/uart.ro                       .data @ 0x00000104 (0 bytes)
+  build/uart/io.ro                         .data @ 0x00000104 (0 bytes)
+
+Global symbols:
+  _start                           0x00000000  (from build/uart/start.ro)
+  delay_ms                         0x000000A0  (from build/uart/uart.ro)
+  main                             0x00000014  (from build/uart/hello.ro)
+  read_ms                          0x000000E4  (from build/uart/io.ro)
+  uart_putc                        0x0000004C  (from build/uart/uart.ro)
+  uart_puts                        0x00000068  (from build/uart/uart.ro)
