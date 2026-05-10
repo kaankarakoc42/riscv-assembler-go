@@ -1,0 +1,21 @@
+// Saat (Clock) Sinyali (Tang Nano 9K'da 27MHz kristal 52. pindedir)
+IO_LOC "clk" 52;
+IO_PORT "clk" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// Reset Butonu (Kart üzerindeki S1 butonunu kullanalım, 3. pindedir)
+IO_LOC "resetn" 3;
+IO_PORT "resetn" IO_TYPE=LVCMOS18 PULL_MODE=UP;
+
+// LED'ler (Tang Nano 9K üzerindeki 6 adet LED pinleri)
+IO_LOC "leds[0]" 10;
+IO_PORT "leds[0]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC "leds[1]" 11;
+IO_PORT "leds[1]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC "leds[2]" 13;
+IO_PORT "leds[2]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC "leds[3]" 14;
+IO_PORT "leds[3]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC "leds[4]" 15;
+IO_PORT "leds[4]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
+IO_LOC "leds[5]" 16;
+IO_PORT "leds[5]" IO_TYPE=LVCMOS18 PULL_MODE=UP DRIVE=8;
