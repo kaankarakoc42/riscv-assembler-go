@@ -1,12 +1,15 @@
-# Linker script for the blink demo (PicoRV32 + Tang Nano 9K, 8 KiB BRAM).
+# Linker script for the blink demo on a single-BRAM PicoRV32 SoC
+# (tap_module.v with `memory[0:1023]` = 1024 words = 4 KiB).
+#
+# If you switch to fpga/soc_top.v (8 KiB), change rom_size to 0x2000.
 
 [memory]
 rom_base = 0x00000000
-rom_size = 0x2000        # 8 KiB
+rom_size = 0x1000        # 4 KiB (1024 × 32-bit words)
 ram_base = 0x00010000
 ram_size = 0x1000
 
 [layout]
 text_at = rom
-data_at = rom            # follow .text in BRAM
+data_at = rom            # .data follows .text in the same BRAM
 entry   = 0x00000000     # PicoRV32 reset vector
