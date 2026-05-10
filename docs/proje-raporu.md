@@ -72,6 +72,27 @@ Alternatif olarak doğrudan düz binary üreten tek geçişli bir assembler geli
 
 Bu tasarım kararı, karmaşıklığı azaltırken linker mimarisinin temel gerekçesini korur: kaynak dosyalar bağımsız derlenir, semboller link aşamasında çözülür ve relocation nihai adrese göre uygulanır (PÇ6).
 
+Projede bu mimari doğrudan repository yapısına yansıtılmıştır:
+
+```text
+.
+├── assembler/     lexer, parser ve RV32I encoder
+├── linker/        section merge, symbol resolution, relocation ve image emit
+├── common/        ISA, object format ve relocation ortak tipleri
+├── fpga/          PicoRV32 tabanlı SoC, BRAM ve pin tanımları
+├── examples/      blink, counter ve UART assembly demoları
+├── tests/         uçtan uca entegrasyon testleri
+└── docs/          mimari, format, relocation ve FPGA dokümantasyonu
+```
+
+Gerçek build akışı aşağıdaki komutlarla çalıştırılmıştır. CLI araçları başarı durumunda sessiz döner; doğrulama `rvdump`, `.map`, `.mem` ve test çıktılarıyla yapılır.
+
+```powershell
+$ go build -o bin/rvasm.exe ./cmd/rvasm
+$ go build -o bin/rvld.exe  ./cmd/rvld
+$ go build -o bin/rvdump.exe ./cmd/rvdump
+```
+
 ## 5. Assembler Tasarımı
 
 Assembler; lexer, parser ve encoder aşamalarından oluşur. Lexer assembly metnini `IDENT`, `NUMBER`, `STRING`, `DIRECTIVE`, `COMMA`, `COLON`, `EOL` gibi token türlerine ayırır. Parser satır tabanlı recursive-descent yaklaşımıyla label, directive ve instruction ifadelerinden AST üretir [10].
@@ -97,6 +118,54 @@ Encoder iki geçişli çalışır. İlk geçişte `.text` ve `.data` section off
 | J-type | `imm[20,10:1,11,19:12]` | Jump offsetini parçalı bitlere dağıtma |
 
 Sembol içeren operandlar yerel sembol olsa bile relocation üretir. Bunun nedeni, section taban adreslerinin assembler tarafından değil linker tarafından belirlenmesidir (PÇ1, PÇ7).
+
+Blink demosundaki gerçek assembly kodu, memory-mapped LED register'a store işlemi yapar ve `delay` sembolünü başka dosyadan çağırır:
+
+```asm
+.global main
+.extern delay
+
+.text
+main:
+    addi sp, sp, -16
+    sw   ra, 12(sp)
+    li   t1, 0x40000000    # LED register
+    li   t2, 0x01
+
+loop:
+    sw   t2, 0(t1)
+    li   a0, 0x40000
+    call delay
+    slli t2, t2, 1
+    li   t3, 0x40
+    bne  t2, t3, no_wrap
+    li   t2, 0x01
+no_wrap:
+    j    loop
+```
+
+Assembler çalıştırma örneği:
+
+```powershell
+$ .\bin\rvasm.exe -o build/report-demo/blink.ro examples/blink/blink.s
+$ .\bin\rvasm.exe -o build/report-demo/start.ro examples/blink/start.s
+```
+
+Üretilen object dosyasının içeriği `rvdump` ile incelendiğinde assembler'ın section, symbol ve relocation kayıtlarını gerçekten ürettiği görülür:
+
+```text
+Sections:
+  idx name          size  flags
+  0   .text           84  AX
+  1   .data            0  AW
+
+Symbols:
+  idx name                     bind    sec value
+  0   main                     GLOBAL  0   0x00000000
+  1   loop                     LOCAL   0   0x00000018
+  2   no_wrap                  LOCAL   0   0x00000044
+  3   delay                    EXTERN  ext 0x00000000
+```
 
 ## 6. RVOB1 Object Dosya Formatı
 
@@ -128,6 +197,51 @@ flowchart TB
 
 Symbol `value` alanı mutlak adres değil section-relative offsettir. Bu tercih, object dosyasının relocatable kalmasını sağlar ve linker'ın section merge sonrasında doğru mutlak adresleri hesaplamasına olanak verir (PÇ6).
 
+RVOB1'in bellekteki Go temsili doğrudan section, symbol ve relocation listelerinden oluşur:
+
+```go
+type Section struct {
+    Name  string
+    Flags uint32
+    Data  []byte
+}
+
+type Symbol struct {
+    Name       string
+    SectionIdx uint8
+    Bind       Binding
+    Value      uint32 // section-relative offset
+}
+
+type Reloc struct {
+    SectionIdx uint8
+    Type       reloc.Type
+    Offset     uint32
+    SymIdx     uint32
+    Addend     int32
+}
+```
+
+`build/report-demo/blink.ro` dosyasının ilk baytları aşağıdaki gibidir:
+
+```text
+00000000  52 56 4F 42 01 00 00 00 02 00 00 00 04 00 00 00
+00000010  04 00 00 00 18 00 00 00 05 2E 74 65 78 74 05 00
+00000020  00 00 54 00 00 00 3C 00 00 00 05 2E 64 61 74 61
+00000030  06 00 00 00 00 00 00 00 90 00 00 00 13 01 01 FF
+```
+
+Byte düzeyinde yorum:
+
+| Offset | Byte'lar | Anlam |
+|---|---|---|
+| `0x00` | `52 56 4F 42` | `"RVOB"` magic |
+| `0x04` | `01 00` | Format version = 1 |
+| `0x08` | `02 00 00 00` | Section sayısı = 2 |
+| `0x0C` | `04 00 00 00` | Symbol sayısı = 4 |
+| `0x10` | `04 00 00 00` | Relocation sayısı = 4 |
+| `0x18` | `05 2E 74 65 78 74` | `.text` section adı |
+
 ## 7. Linker Tasarımı
 
 Linker, bir veya daha fazla RVOB1 object dosyasını alır ve hedef memory layout'a uygun final image üretir. Tasarımda section merge, global symbol table, extern resolution, relocation pass ve image emit aşamaları ayrılmıştır [10].
@@ -147,6 +261,53 @@ Section merge aşamasında tüm `.text` section'ları giriş sırasına göre bi
 Global symbol table aşamasında local semboller modül içinde kalır, global semboller ortak tabloya girer ve duplicate global semboller hata kabul edilir. Extern semboller bu global tabloya karşı çözülür. Çözülemeyen extern sembol final image üretimini durdurur; bu davranış hatalı programın donanıma yüklenmesini engeller (PÇ1, PÇ6).
 
 Alternatif tasarım olarak tüm dosyaları tek kaynak dosyada birleştirip assemble etmek mümkündür. Ancak bu yaklaşım modülerliği, ayrı derlemeyi ve bağımsız test edilebilirliği azaltır. Bu nedenle linker aşaması bilinçli olarak ayrı tutulmuştur [2], [5].
+
+Blink demosunda kullanılan linker script, reset vector ve BRAM yerleşimini açıkça belirtir:
+
+```toml
+[memory]
+rom_base = 0x00000000
+rom_size = 0x1000
+ram_base = 0x00010000
+ram_size = 0x1000
+
+[layout]
+text_at = rom
+data_at = rom
+entry   = 0x00000000
+```
+
+Gerçek linker komutu:
+
+```powershell
+$ .\bin\rvld.exe -script examples/blink/link.toml `
+    -o build/report-demo/blink `
+    build/report-demo/start.ro build/report-demo/blink.ro
+```
+
+Üretilen map dosyası section merge ve symbol resolution sonucunu gösterir:
+
+```text
+Memory layout:
+  .text @ 0x00000000 (120 bytes)
+  .data @ 0x00000078 (0 bytes)
+
+Input placements:
+  build/report-demo/start.ro               .text @ 0x00000000 (36 bytes)
+  build/report-demo/blink.ro               .text @ 0x00000024 (84 bytes)
+
+Global symbols:
+  _start                           0x00000000
+  delay                            0x00000014
+  main                             0x00000024
+```
+
+Eksik object ile linkleme denendiğinde linker beklenen şekilde hata üretir:
+
+```text
+$ .\bin\rvld.exe -script examples/blink/link.toml -o build/report-demo/broken build/report-demo/blink.ro
+rvld: link: undefined reference to "delay" (used in build/report-demo/blink.ro)
+```
 
 ## 8. Relocation Sistemi
 
@@ -181,6 +342,34 @@ HI20/LO12 çiftinde LO12 alanı sign-extend edildiği için bit 11 set olduğund
 
 Branch için ±4096 bayt, JAL için ±1 MiB ve LO12 için ±2048 aralığı kontrol edilir. Taşma durumunda sessiz kırpma yapılmaz; linker hard error üretir. Bu hata yönetimi, teknik doğruluk ve güvenilir imaj üretimi için gereklidir (PÇ1, PÇ7).
 
+`rvdump` çıktısı, `blink.ro` içinde dört gerçek relocation kaydı üretildiğini gösterir:
+
+```text
+Relocations:
+  sec off type              symbol   addend
+  0    36  R_RV32_PCREL_HI20 delay   0
+  0    40  R_RV32_PCREL_LO12_I delay 0
+  0    56  R_RV32_BRANCH     no_wrap 0
+  0    68  R_RV32_JAL        loop    0
+```
+
+Relocation patching için branch örneği:
+
+```text
+Patch öncesi word : 01c39063
+Patch sonrası word: 01c39663
+Relocation        : R_RV32_BRANCH no_wrap
+Gerekçe           : no_wrap hedefi link sonrası PC-relative offset ile yeniden hesaplanır.
+```
+
+Geri branch örneği ise delay döngüsünde görülür:
+
+```text
+Instruction       : bnez t0, delay_loop
+Final word        : fe029ee3
+Yorum             : Negatif PC-relative offset B-type immediate bitlerine dağıtılmıştır.
+```
+
 ## 9. FPGA Entegrasyonu
 
 FPGA entegrasyonu PicoRV32 işlemci çekirdeği, 8 KiB BRAM ve memory-mapped I/O birimleri üzerinden yapılır. PicoRV32, küçük FPGA sistemleri için uygun açık kaynak bir RV32I çekirdeğidir [3]. Tang Nano 9K / GW1NR FPGA akışı Gowin araçlarıyla sentez ve programlama adımlarını destekler [8].
@@ -207,7 +396,50 @@ Linker tarafından üretilen `.mem` dosyası `$readmemh` formatındadır. Her sa
 initial $readmemh(INIT_FILE, mem);
 ```
 
-PicoRV32 reset vektörü `0x00000000` olduğu için `.text` section'ı aynı adrese yerleştirilir [10]. LED demo memory-mapped `0x80000000` adresine store işlemi yaparak görsel çıktı üretir. UART demo `0x80000010` üzerinden veri yazar ve busy bitini okuyarak seri iletişimi doğrular (PÇ1).
+PicoRV32 reset vektörü `0x00000000` olduğu için `.text` section'ı aynı adrese yerleştirilir [10]. `soc_top.v` bellek haritasında LED register `0x80000000` adresindedir; `examples/blink/blink.s` içindeki Tang Nano tek-BRAM demo yolu ise `tap_module.v` uyumluluğu için `0x40000000` adresini kullanır. UART demo `0x80000010` üzerinden veri yazar ve busy bitini okuyarak seri iletişimi doğrular (PÇ1).
+
+Blink için üretilen `.mem` çıktısının ilk satırları BRAM'e yüklenecek 32 bit word dizisidir:
+
+```text
+00002137
+00010113
+00000097
+01c080e7
+0000006f
+00050293
+fff28293
+fe029ee3
+00008067
+```
+
+Aynı imajın Intel HEX çıktısı:
+
+```text
+:020000040000FA
+:10000000372100001301010097000000E780C001C4
+:100010006F000000930205009382F2FFE39E02FE50
+:1000200067800000130101FF232611003703004001
+:100030001303030093031000130000002320730038
+:00000001FF
+```
+
+FPGA build akışı şu adımlarla yürütülür:
+
+```powershell
+$ Copy-Item build/report-demo/blink.mem fpga/common/program.mem
+$ # Gowin EDA içinde:
+$ # 1. fpga/common/tap_module.v top seçilir
+$ # 2. fpga/common/program.hex veya program.mem BRAM init için kullanılır
+$ # 3. Synthesize -> Place & Route -> Program Device
+```
+
+BRAM yükleme noktası Verilog tarafında `$readmemh` çağrısıdır:
+
+```verilog
+initial begin
+    $readmemh(INIT_FILE, mem);
+end
+```
 
 ## 10. Test Tasarımı
 
@@ -233,6 +465,33 @@ End-to-end blink testi, çok dosyalı programda `_start`, `main` ve `delay` semb
 Forward/backward branch testi, hem ileri hem geri PC-relative offsetlerin doğru encode edildiğini gösterir. Bu sonuç özellikle B-type ve J-type immediate alanlarının parçalı yerleşimi nedeniyle önemlidir [1]. `la` pseudo-instruction testi ise AUIPC + ADDI çiftinde PC-relative HI20/LO12 eşleşmesinin doğru uygulandığını gösterir [9].
 
 Hata testleri de başarı kriteridir. Branch overflow testinde relocation alanı yetmediğinde işlem durdurulur. Undefined extern testinde çözülemeyen sembolle final image üretilmez. Duplicate label testinde aynı dosyadaki sembol çakışması assembly aşamasında yakalanır. Bu davranışlar, hatalı programı sessizce FPGA'ya yükleme riskini azaltır (PÇ7, PÇ1).
+
+Gerçek test komutu ve çıktı özeti:
+
+```powershell
+$ go test ./...
+ok  	github.com/edu/rvtoolchain/assembler/encoder	(cached)
+ok  	github.com/edu/rvtoolchain/assembler/lexer	(cached)
+ok  	github.com/edu/rvtoolchain/assembler/parser	(cached)
+ok  	github.com/edu/rvtoolchain/common/isa	(cached)
+ok  	github.com/edu/rvtoolchain/common/obj	(cached)
+ok  	github.com/edu/rvtoolchain/linker/image	(cached)
+ok  	github.com/edu/rvtoolchain/linker/reloc	(cached)
+ok  	github.com/edu/rvtoolchain/linker/script	(cached)
+ok  	github.com/edu/rvtoolchain/tests	(cached)
+```
+
+Entegrasyon testlerinde doğrulanan örneklerden bazıları:
+
+```text
+TestEndToEnd_Blink
+TestForwardAndBackwardBranchesCoexist
+TestBranchOverflowIsRejected
+TestDuplicateLocalLabelInOneFile
+TestUndefinedExternAcrossFiles
+TestDataAbsoluteReference
+TestLAPseudoCorrectness
+```
 
 | Sonuç türü | Gözlenen davranış | Yorum |
 |---|---|---|
