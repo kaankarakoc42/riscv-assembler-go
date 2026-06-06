@@ -1,0 +1,54 @@
+// ─────────────────────────────────────────────────────────────────────
+// tangnano9k.cst -- Tang Nano 9K pin atamaları (Gowin constraint format)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Pin atamaları Tang Nano 9K kullanım kılavuzu ve Sipeed/Lushay Labs
+// referans materyalinden alınmıştır.
+//
+// Top modül imzası:
+//   module top(
+//       input  sys_clk,        // 27 MHz onboard kristal
+//       input  sys_rst_n,      // S1 (reset düğmesi)
+//       input  [1:0] buttons,  // S1=buttons[0] da kullanılıyor*, S2=buttons[1]
+//       output [5:0] led,      // 6 onboard LED
+//       input  uart_rx_pin,    // BL702 USB-UART köprüsü RX
+//       output uart_tx_pin     // BL702 USB-UART köprüsü TX
+//   );
+//
+// *Not: S1 hem sys_rst_n hem buttons[0] olarak iki yere bağlı. Sistem
+//  reset için kullanılırken aynı zamanda yazılım tarafından da
+//  okunabilir. İkincil kullanım için S2 (buttons[1]) tavsiye edilir.
+// ─────────────────────────────────────────────────────────────────────
+
+// ─── Saat ─────────────────────────────────────────────────────────────
+IO_LOC  "sys_clk" 52;
+IO_PORT "sys_clk" PULL_MODE=UP;
+
+// ─── Reset düğmesi (S1, pin 3) ───────────────────────────────────────
+IO_LOC  "sys_rst_n" 3;
+IO_PORT "sys_rst_n" PULL_MODE=UP;
+
+// ─── Kullanıcı butonu (S2, pin 4) ────────────────────────────────────
+// button_s2 yazılım tarafından okunabilir (button_toggle.s programı
+// bunu kullanır, BUTON MMIO bit 0).
+IO_LOC  "button_s2" 4;
+IO_PORT "button_s2" PULL_MODE=UP;
+
+// ─── LED'ler (6 adet, active-low) ────────────────────────────────────
+IO_LOC  "led[0]" 10;
+IO_LOC  "led[1]" 11;
+IO_LOC  "led[2]" 13;
+IO_LOC  "led[3]" 14;
+IO_LOC  "led[4]" 15;
+IO_LOC  "led[5]" 16;
+
+// ─── UART (BL702 USB-UART köprüsüne bağlı) ───────────────────────────
+// Tang Nano 9K şemasına göre:
+//   FPGA pin 17 = uart_tx_pin → BL702 RX → bilgisayara TX
+//   FPGA pin 18 = uart_rx_pin → BL702 TX → bilgisayardan RX
+//
+// (Lushay Labs tutorial konvansiyonu: pin 17 TX, pin 18 RX)
+IO_LOC  "uart_tx_pin" 17;
+IO_PORT "uart_tx_pin" IO_TYPE=LVCMOS33;
+IO_LOC  "uart_rx_pin" 18;
+IO_PORT "uart_rx_pin" IO_TYPE=LVCMOS33 PULL_MODE=UP;

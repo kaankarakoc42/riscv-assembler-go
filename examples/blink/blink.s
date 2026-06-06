@@ -23,7 +23,7 @@ main:
     addi sp, sp, -16
     sw   ra, 12(sp)
 
-    li   t1, 0x40000000    # t1 ← &LEDs
+    li   t1, 0x80000000    # t1 ← &LEDs
     li   t2, 0x01          # t2 ← starting LED bit
 
 loop:

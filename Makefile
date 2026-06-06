@@ -23,17 +23,19 @@ ifeq ($(OS),Windows_NT)
   # The leading `-` tells make to ignore non-zero exits anyway.
   MKDIR  = -@if not exist "$(subst /,\,$(1))" mkdir "$(subst /,\,$(1))"
   RMDIR  = -@if exist "$(subst /,\,$(1))" rmdir /s /q "$(subst /,\,$(1))"
+  CP     = copy /Y "$(subst /,\,$(1))" "$(subst /,\,$(2))"
 else
   EXE   :=
   MKDIR  = @mkdir -p "$(1)"
   RMDIR  = @rm -rf "$(1)"
+  CP     = cp "$(1)" "$(2)"
 endif
 
 RVASM  := $(BINDIR)/rvasm$(EXE)
 RVLD   := $(BINDIR)/rvld$(EXE)
 RVDUMP := $(BINDIR)/rvdump$(EXE)
 
-.PHONY: all build test demos clean fmt \
+.PHONY: all build test demos loader clean fmt \
         blink-demo counter-demo uart-demo
 
 all: build test demos
@@ -89,6 +91,14 @@ uart-demo: build
 	         -o $(BUILD)/uart/hello \
 	         $(BUILD)/uart/start.ro $(BUILD)/uart/hello.ro \
 	         $(BUILD)/uart/uart.ro  $(BUILD)/uart/io.ro
+
+loader: build
+	$(call MKDIR,$(BUILD)/loader)
+	$(RVASM) -o $(BUILD)/loader/loader.ro gowin/loader.s
+	$(RVLD)  -script gowin/loader_link.toml \
+	         -o $(BUILD)/loader/loader \
+	         $(BUILD)/loader/loader.ro
+	$(call CP,$(BUILD)/loader/loader.mem,gowin/loader.hex)
 
 # ─── clean ───────────────────────────────────────────────────────────────
 clean:
